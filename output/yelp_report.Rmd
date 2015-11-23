@@ -1,0 +1,240 @@
+---
+title: "Coursera Data Science Capstone Project"
+author: "David Doyle"
+date: "November 14, 2015"
+output:
+  pdf_document: default
+  html_document:
+    fig_caption: yes
+    highlight: monochrome
+    number_sections: no
+    smart: yes
+    theme: readable
+references:
+- DOI: 10.1038/nmat3283
+  URL: http://dx.doi.org/10.1038/nmat3283
+  author:
+  - family: Fenner
+    given: Martin
+  container-title: Nature Materials
+  id: fenner2012a
+  issue: 4
+  issued:
+    month: 3
+    year: 2012
+  page: 261-263
+  publisher: Nature Publishing Group
+  title: One-click science marketing
+  type: article-journal
+  volume: 11
+---
+
+
+
+# Exploring the influence of ambience on the business score
+
+
+## Introduction
+
+The Yelp datasets offer many oppportunities for exploring the data for useful business insights. The question I have decided to pursue is:
+
+>Does the ambience of each business influence the review score - i.e. do certain ambiences  tend to result in higher or lower scores overall.
+
+In an ideal world one would expect that the ambience would not be the sole influence on the score - the score should be a reflection of the customer experience. I intend to use the business data set to test my hypothesis that ambience is not a good predictor of the score (number of stars) assigned to a business.
+
+<!-- Example of reference @fenner2012a [p. 33] says blah blah -->
+
+```{r, echo=FALSE}
+# exploratory analysis of business data
+load('C:/Users/david/datasciencecoursera/Capstone/YelpProject/tr.business.rdata')
+# first let's specify the columns we want to keep
+
+keep_columns = c( "attributes.Ambience.romantic",                        
+                 "attributes.Ambience.intimate"       , "attributes.Ambience.classy",                          
+                 "attributes.Ambience.hipster"        , "attributes.Ambience.divey" ,                          
+                 "attributes.Ambience.touristy"       , "attributes.Ambience.trendy",                          
+                 "attributes.Ambience.upscale"        , "attributes.Ambience.casual"  )
+
+businessdata <- tr.business[keep_columns]
+
+# tidy up the column names
+colnames(businessdata) <- gsub("attributes.Ambience.","",colnames(businessdata))
+
+
+```
+
+## Methods and Data
+*describe the (or multiple) statistical model, prediction algorithm or statistical inference described in the method*
+
+*needs some exploratory data analysis with plots/summary tables that interogate the question of interest - has to be relevant to the question*
+
+The code needed to reproduce the results for this report is located on GitHub in the following repository:  **put repository here**
+
+### Exploring the Data
+
+The initial task was to read the business dataset and convert it from JSON into a data frame.  As the time to extract and convert the data is significant the resulting data frame is saved so that it can be reloaded directly in the future without the conversion overhead.
+
+The next task is to explore the data by profiling the fields of interest - in this case to understand the makeup of the data related to ambience. As can be seen in the summary below, it is obvious that compared to the `r prettyNum(nrow(businessdata), big.mark=",")` rows in the dataset the ambience data is very sparsely populated.  This makes sense as it would not apply to many categories of business.
+
+```{r, echo=FALSE}
+summary(businessdata)
+```
+
+```{r, echo=FALSE}
+# subset to remove rows without any ambience value
+businessdata.sub <- subset(businessdata, as.logical(romantic) |                         
+                 as.logical(intimate) | as.logical(classy) | 
+                 as.logical(hipster)  | as.logical(divey)  |                          
+                 as.logical(touristy) | as.logical(trendy) |                          
+                 as.logical(upscale)  | as.logical(casual)   ) 
+
+```
+Removing the businesses where no ambience value is populated provides a smaller set of data for evaluation - `r prettyNum(nrow(businessdata.sub), big.mark=",")` rows.  This is `r round((nrow(businessdata.sub) / nrow(businessdata)) * 100,digits=0)`% of the original data. I will focus on this set of data so my question was refined into  "Does the ambience of each business influence the review score _when one or more of the ambience fields are populated_?"
+
+As can be seen from the revised summary and plot of the values set to TRUE the casual ambiance setting is very common. Can we make a prediction with only this information? 
+```{r, echo=FALSE}
+summary(businessdata.sub)
+#slices = c( sum(businessdata.sub$attributes.Ambience.romantic), sum(businessdata.sub$attributes.Ambiance.intimate) )
+#slices <- colSums(Filter(businessdata.sub, na.rm = TRUE, -1)
+slices <- c(sum(as.logical(businessdata.sub$romantic), na.rm=TRUE),
+            sum(as.logical(businessdata.sub$intimate), na.rm=TRUE),
+            sum(as.logical(businessdata.sub$classy), na.rm=TRUE),
+            sum(as.logical(businessdata.sub$hipster), na.rm=TRUE),
+            sum(as.logical(businessdata.sub$divey), na.rm=TRUE),
+            sum(as.logical(businessdata.sub$touristy), na.rm=TRUE),
+            sum(as.logical(businessdata.sub$trendy), na.rm=TRUE),
+            sum(as.logical(businessdata.sub$upscale), na.rm=TRUE),
+            sum(as.logical(businessdata.sub$casual), na.rm=TRUE) )
+pie(slices, labels=colnames(businessdata.sub),main="Distribution of Ambience Values")
+#barplot(slices,labels=gsub("attributes.Ambience.","",names(businessdata.sub)))
+```
+
+### Building A Prediction Model
+Two prediction models that are most suitable for use with binary predictors (the TRUE/FALSE ambience values) were attempted - Random Forest and Naive Bayes.  In both cases a data split approach was used to derive and test a prediction model. The data was split into a 60% training set and a 40% testing set.
+The accuracy of each method was determined using a confusion matrix.
+
+
+```{r, echo=FALSE}
+# build a subset to use for prediction
+#load('C:/Users/david/datasciencecoursera/Capstone/YelpProject/tr.business.rdata')
+# first let's specify the columns we want to keep
+
+keep_columns = c( "stars","attributes.Ambience.romantic",                        
+                 "attributes.Ambience.intimate"       , "attributes.Ambience.classy",                          
+                 "attributes.Ambience.hipster"        , "attributes.Ambience.divey" ,                          
+                 "attributes.Ambience.touristy"       , "attributes.Ambience.trendy",                          
+                 "attributes.Ambience.upscale"        , "attributes.Ambience.casual"  )
+
+businessdata <- tr.business[keep_columns]
+
+# tidy up the column names
+colnames(businessdata) <- gsub("attributes.Ambience.","",colnames(businessdata))
+
+# subset to remove rows without any ambience value
+businessdata.sub <- subset(businessdata, as.logical(romantic) |                         
+                 as.logical(intimate) | as.logical(classy) | 
+                 as.logical(hipster)  | as.logical(divey)  |                          
+                 as.logical(touristy) | as.logical(trendy) |                          
+                 as.logical(upscale)  | as.logical(casual)   )  
+
+
+# summary(businessdata.sub$stars) 
+```
+To support creation of the prediction models some additional cleansing was applied to the data:
+* as there was only one single-star measurement (see the summary below) it was dropped
+* the entries containing NAs were also dropped as the prediction approaches selected do not support the use of NA values
+ 
+```{r, echo=FALSE, warning=FALSE}
+library(caret)
+library(ggplot2)
+library(ISLR)
+library(plyr)
+count(businessdata.sub, 'stars')
+
+# build a prediction algorithm
+set.seed(71)
+
+# drop factor 
+
+#businessdata.sub$stars <- as.factor(businessdata.sub$stars)
+businessdata.sub[] <- lapply(businessdata.sub, factor)
+businessdata.sub<- droplevels(subset(businessdata.sub,businessdata.sub$stars != "1"))
+
+
+# split into 60% training, 40% testing data sets and drop rows containing NA
+inTrain <- createDataPartition(y=businessdata.sub$stars, p=0.60, list=FALSE)
+
+training <- businessdata.sub[inTrain,]
+training <- training[complete.cases(training),]
+
+testing <- businessdata.sub[-inTrain,]
+testing <- testing[complete.cases(testing),]
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE}
+# train the model
+#training$stars <- as.factor(training$stars)
+rf_model <- train(stars ~ ., data=training, method="rf", allowParallel=TRUE, na.action = na.omit)
+
+nb_model <- train(stars~., method="nb",data=training)
+
+
+# use repeated k-fold validation to determine if it will improve results
+
+train_control <- trainControl(method="repeatedcv", number=10, repeats=3)
+
+rf_model2 <- train(stars~., method="rf",data=training, trControl=train_control)
+
+nb_model2 <- train(stars~., method="nb",data=training, trControl=train_control)
+
+
+#print(rf_model)
+
+```
+
+
+## Results
+
+```{r, echo=FALSE, warning=FALSE}
+
+rf_results <- confusionMatrix(testing$stars,predict(rf_model,testing))
+#print(rf_results)
+```
+
+```{r, echo=FALSE, warning=FALSE}
+
+nb_results <- confusionMatrix(testing$stars, predict(nb_model,testing))
+#print(nb_results)
+```
+The confusion matrix using the Random Forest approach yielded an accuracy of `r rf_results$overall['Accuracy']`,  while the accuracy of the Naive Bayes approach was even less impressive at `r nb_results$overall['Accuracy']`.
+
+The results of both approaches are disappointing so they were retried using repeated k-fold cross validation. For Random Forest:
+```{r, echo=FALSE, warning=FALSE}
+
+rf_results2 <- confusionMatrix(testing$stars,predict(rf_model2,testing))
+print(rf_results2$overall)
+```
+...and for the Naive Bayes model:
+```{r, echo=FALSE, warning=FALSE}
+
+nb_results2 <- confusionMatrix(testing$stars,predict(nb_model2,testing))
+print(nb_results2$overall)
+```
+For the Random Forest model the accuracy was unchanged at `r rf_results2$overall['Accuracy']` and better by a small margin for the Naive Bayes model at `r nb_results2$overall['Accuracy']`
+
+
+## Discussion
+As can be seen from the previous section it is *not* possible to predict the star score with any reasonable accuracy when provided the ambience values.  This supports my hypothesis that ambience does not play a significant influence on the overall business score. 
+
+While it may influence the customer experience somewhat I believe that the customers most concerned with ambience are going to self-select and avoid establishments with an ambience that does not match their tastes.  The remaining customers are going to rate the overall customer experience with ambience only being one factor in the ranking.  Further analysis could be done on the Yelp datasets to determine the potential influence of these other factors - possibly using the content of the reviews to idetify the customer sentiment and look for keywords that reflect the sentiment and are associated with high/low socres.
+
+
+
+
+
+
+
+
+<!--## References -->
